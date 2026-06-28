@@ -68,16 +68,10 @@ fetch() {
     dest="$2"
 
     if command -v deno >/dev/null 2>&1; then
-        deno eval \
+        deno run \
             --allow-net=cfstore.rethinkdns.com \
             --allow-write=src \
-            'const [url, dest] = Deno.args;
-const res = await fetch(url);
-if (!res.ok) {
-  console.error(`${url}: ${res.status} ${res.statusText}`);
-  Deno.exit(22);
-}
-await Deno.writeFile(dest, new Uint8Array(await res.arrayBuffer()));' \
+            ./src/build/fetch.ts \
             "$url" "$dest"
         return $?
     fi
