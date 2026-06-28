@@ -63,8 +63,24 @@ mmdef=${mmdef#0}
 # defaults: stackoverflow.com/a/28085062
 : "${wk:=$wkdef}" "${mm:=$mmdef}" "${yyyy:=$yyyydef}"
 
-# wget opts: superuser.com/a/689340
-wgetopts="--tries=3 --retry-on-http-error=404 --waitretry=3 --no-dns-cache"
+fetch() {
+    url="$1"
+    dest="$2"
+
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --retry 3 --retry-delay 3 "$url" -o "$dest"
+        return $?
+    fi
+
+    if command -v wget >/dev/null 2>&1; then
+        # wget opts: superuser.com/a/689340
+        wget --tries=3 --retry-on-http-error=404 --waitretry=3 --no-dns-cache -q "$url" -O "$dest"
+        return $?
+    fi
+
+    echo "==x= pre.sh: neither curl nor wget is available"
+    return 127
+}
 
 # stackoverflow.com/a/1445507
 max=4
@@ -79,7 +95,7 @@ do
         echo "=x== pre.sh: no op ${out}"
         exit 0
     else
-        wget $wgetopts -q "${burl}/${yyyy}/${dir}/${mm}-${wk}/${codec}/${f}" -O "${out}"
+        fetch "${burl}/${yyyy}/${dir}/${mm}-${wk}/${codec}/${f}" "${out}"
         wcode=$?
 
         if [ $wcode -eq 0 ]; then
@@ -90,20 +106,19 @@ do
                 fulltimestamp=$(cut -d"," -f8 "$out" | cut -d":" -f2 | tr -dc '0-9/')
             fi
             echo "==x= pre.sh: $i ok $wcode; filetag? ${fulltimestamp}"
-            wget $wgetopts -q "${burl}/${fulltimestamp}/${codec}/${f2}" -O "${out2}"
+            fetch "${burl}/${fulltimestamp}/${codec}/${f2}" "${out2}"
             wcode2=$?
             if [ $wcode2 -eq 0 ]; then
               echo "===x pre.sh: $i filetag ok $wcode2"
               exit 0
             else
               echo "===x pre.sh: $i not ok $wcode2"
+              rm -f "${out}" "${out2}"
               exit 1
-              rm ${out}
-              rm ${out2}
             fi
         else
-            # wget creates blank files on errs
-            rm ${out}
+            # curl/wget may create blank files on errs
+            rm -f "${out}"
             echo "==x= pre.sh: $i not ok $wcode"
         fi
     fi
