@@ -67,6 +67,21 @@ fetch() {
     url="$1"
     dest="$2"
 
+    if command -v deno >/dev/null 2>&1; then
+        deno eval \
+            --allow-net=cfstore.rethinkdns.com \
+            --allow-write=src \
+            'const [url, dest] = Deno.args;
+const res = await fetch(url);
+if (!res.ok) {
+  console.error(`${url}: ${res.status} ${res.statusText}`);
+  Deno.exit(22);
+}
+await Deno.writeFile(dest, new Uint8Array(await res.arrayBuffer()));' \
+            "$url" "$dest"
+        return $?
+    fi
+
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL --retry 3 --retry-delay 3 "$url" -o "$dest"
         return $?
@@ -78,7 +93,7 @@ fetch() {
         return $?
     fi
 
-    echo "==x= pre.sh: neither curl nor wget is available"
+    echo "==x= pre.sh: none of deno, curl, or wget is available"
     return 127
 }
 
